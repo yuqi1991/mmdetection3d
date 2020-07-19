@@ -103,6 +103,13 @@ class VoxelNet(SingleStage3DDetector):
         ]
         return bbox_results[0]
 
+    def forward_dummy(self, img):
+        x = self.backbone(img)
+        if self.with_neck:
+            x = self.neck(x)
+        return x
+
+
     def aug_test(self, points, img_metas, imgs=None, rescale=False):
         """Test function with augmentaiton."""
         feats = self.extract_feats(points, img_metas)
