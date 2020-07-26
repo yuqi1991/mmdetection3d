@@ -105,13 +105,14 @@ class PillarFeatureNet(nn.Module):
 
         # Find distance of x, y, and z from pillar center
         if self._with_voxel_center:
-            f_center = features[:, :, :2]
-            f_center[:, :, 0] = f_center[:, :, 0] - (
+            f_temp = features[:, :, :2]
+            f_temp_0 = f_temp[:, :, 0] - (
                 coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
                 self.x_offset)
-            f_center[:, :, 1] = f_center[:, :, 1] - (
+            f_temp_1 = f_temp[:, :, 1] - (
                 coors[:, 2].type_as(features).unsqueeze(1) * self.vy +
                 self.y_offset)
+            f_center = torch.stack([f_temp_0,f_temp_1],dim=2)
             features_ls.append(f_center)
 
         if self._with_distance:

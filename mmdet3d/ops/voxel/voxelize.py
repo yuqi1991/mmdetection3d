@@ -5,7 +5,7 @@ from torch.autograd import Function
 from torch.nn.modules.utils import _pair
 
 from .voxel_layer import dynamic_voxelize, hard_voxelize
-
+from torch.onnx import register_custom_op_symbolic
 
 class _Voxelization(Function):
 
@@ -58,7 +58,21 @@ class _Voxelization(Function):
             return voxels_out, coors_out, num_points_per_voxel_out
 
 
+
+
 voxelization = _Voxelization.apply
+
+from torch.onnx.symbolic_helper import parse_args
+from torch.onnx import register_custom_op_symbolic
+
+@parse_args('v', 'v', 'f', 'i')
+def symbolic(g, ctx, points, voxel_size, coors_range, max_points=35, max_voxels=20000):
+    #return g.op("nonentity", mat1, mat2, self, beta_f=beta, alpha_f=alpha)
+    return g.op("_Voxelization",ctx, points,coors_range, max_points, max_voxels)
+
+
+register_custom_op_symbolic("custom_ops::_Voxelization", symbolic, 9)
+
 
 
 class Voxelization(nn.Module):

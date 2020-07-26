@@ -40,6 +40,7 @@ class VoxelNet(SingleStage3DDetector):
         voxel_features = self.voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0].item() + 1
         x = self.middle_encoder(voxel_features, coors, batch_size)
+        print("x shape ", x.shape)
         x = self.backbone(x)
         if self.with_neck:
             x = self.neck(x)
@@ -103,8 +104,17 @@ class VoxelNet(SingleStage3DDetector):
         ]
         return bbox_results[0]
 
-    def forward_dummy(self, img):
-        x = self.backbone(img)
+    def forward_dummy(self, voxels, num_points, coors):
+        # voxels, num_points, coors = self.voxelize(points)
+        # voxel_features = self.voxel_encoder(voxels, num_points, coors)
+        # batch_size = coors[-1, 0].item() + 1
+        # x = self.middle_encoder(voxel_features, coors, batch_size)
+
+        voxel_features = self.voxel_encoder(voxels, num_points, coors)
+        # batch_size = coors[-1, 0].item() + 1
+        batch_size = 1
+        x = self.middle_encoder(voxel_features, coors, batch_size)
+        x = self.backbone(x)
         if self.with_neck:
             x = self.neck(x)
         return x

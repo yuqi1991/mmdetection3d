@@ -43,7 +43,7 @@ def export_onnx_model(model, inputs, passes):
                 inputs,
                 f,
                 operator_export_type=OperatorExportTypes.ONNX,
-
+                keep_initializers_as_inputs=True
                 # verbose=True,  # NOTE: uncomment this for debugging
                 # export_params=True,
             )
@@ -54,7 +54,7 @@ def export_onnx_model(model, inputs, passes):
         all_passes = optimizer.get_available_passes()
         assert all(p in all_passes for p in passes), \
             f'Only {all_passes} are supported'
-    # onnx_model = optimizer.optimize(onnx_model, passes)
+    onnx_model = optimizer.optimize(onnx_model, passes)
     return onnx_model
 
 def to_numpy(tensor):
@@ -67,11 +67,16 @@ def check_onnx_model(model_file, dummy, torch_result):
     ort_session = onnxruntime.InferenceSession(model_file)
 
     # compute ONNX Runtime output prediction
-    ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(dummy)}
+    ort_inputs = {inputs.name: to_numpy(dummy[i]) for i, inputs in enumerate(ort_session.get_inputs())}
+
     ort_outs = ort_session.run(None, ort_inputs)
 
     # compare ONNX Runtime and PyTorch results
-    np.testing.assert_allclose(to_numpy(torch_result[0]), ort_outs[0], rtol=1e-03, atol=1e-05)
+    np.testing.assert_allclose(to_numpy(torch_result[0]), ort_outs[0], rtol=1e-03, atol=1e-07)
+
+    # with open("test_result", "wb") as f:
+    #     (torch_result[0]).detach().numpy().tofile(f)
+    # f.close()
 
     print("Exported model has been tested with ONNXRuntime, and the result looks good!")
 
@@ -88,7 +93,7 @@ def parse_args():
         '--shape',
         type=int,
         nargs='+',
-        default=[1, 64, 496, 432],
+        default=[18279,4],
         help='input image size')
     parser.add_argument(
         '--passes', type=str, nargs='+', help='ONNX optimization passes')
@@ -120,18 +125,32 @@ def main():
             'ONNX conversion is currently not currently supported with '
             f'{model.__class__.__name__}')
 
-    input_data = torch.rand(args.shape,dtype=next(model.parameters()).dtype,
+    input_data = torch.zeros(args.shape,dtype=next(model.parameters()).dtype,
                          device=next(model.parameters()).device)
+    input_data.fill_(0.5)
 
-    onnx_model = export_onnx_model(model, (input_data, ), args.passes)
+    # with open("", "rb") as f:
+    voxels = np.fromfile("/home/ubuntu/Downloads/save_result/voxels_4", dtype=np.float32)
+    voxels=voxels.reshape([-1,32,4])
+    voxels=torch.from_numpy(voxels)
+
+    num_points = np.fromfile("/home/ubuntu/Downloads/save_result/num_points_4", dtype=np.int32)
+    # num_points=num_points.reshape([-1,4])
+    num_points=torch.from_numpy(num_points)
+
+    coors = np.fromfile("/home/ubuntu/Downloads/save_result/coors_4", dtype=np.int32)
+    coors=coors.reshape([-1,4])
+    coors=torch.from_numpy(coors)
+
+    onnx_model = export_onnx_model(model, (voxels,num_points,coors ), args.passes)
     # Print a human readable representation of the graph
     onnx.helper.printable_graph(onnx_model.graph)
     print(f'saving model in {args.out}')
     onnx.save(onnx_model, args.out)
 
-    torch_result = model(input_data)
+    torch_result = model(voxels,num_points,coors)
 
-    check_onnx_model(args.out, input_data,torch_result)
+    check_onnx_model(args.out, (voxels,num_points,coors ),torch_result)
 
 
 if __name__ == '__main__':
