@@ -64,6 +64,24 @@ class VoxelNet(SingleStage3DDetector):
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
+    @torch.no_grad()
+    def voxelize_dummy(self, points):
+        """Apply hard voxelization to points."""
+        # voxels, coors, num_points = [], [], []
+        # for res in points:
+        voxels, coors, num_points = self.voxel_layer(points)
+        # voxels.append(res_voxels)
+        # coors.append(res_coors)
+        # num_points.append(res_num_points)
+        # voxels = torch.cat(voxels, dim=0)
+        # num_points = torch.cat(num_points, dim=0)
+        # coors_batch = []
+        # for i, coor in enumerate(coors):
+        coors = F.pad(coors, (1, 0), mode='constant', value=0)
+            # coors_batch.append(coor_pad)
+        # coors_batch = torch.cat(coors_batch, dim=0)
+        return voxels, num_points, coors
+
     def forward_train(self,
                       points,
                       img_metas,
@@ -104,20 +122,16 @@ class VoxelNet(SingleStage3DDetector):
         ]
         return bbox_results[0]
 
-    def forward_dummy(self, voxels, num_points, coors):
-        # voxels, num_points, coors = self.voxelize(points)
-        # voxel_features = self.voxel_encoder(voxels, num_points, coors)
-        # batch_size = coors[-1, 0].item() + 1
-        # x = self.middle_encoder(voxel_features, coors, batch_size)
-
+    def forward_dummy(self, points):
+        voxels, num_points, coors = self.voxelize_dummy(points)
         voxel_features = self.voxel_encoder(voxels, num_points, coors)
         # batch_size = coors[-1, 0].item() + 1
         batch_size = 1
-        x = self.middle_encoder(voxel_features, coors, batch_size)
-        x = self.backbone(x)
-        if self.with_neck:
-            x = self.neck(x)
-        return x
+        # x = self.middle_encoder(voxel_features, coors, batch_size)
+        # x = self.backbone(x)
+        # if self.with_neck:
+        #     x = self.neck(x)
+        return voxel_features
 
 
     def aug_test(self, points, img_metas, imgs=None, rescale=False):

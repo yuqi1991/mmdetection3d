@@ -5,11 +5,11 @@ from torch.autograd import Function
 from torch.nn.modules.utils import _pair
 
 from .voxel_layer import dynamic_voxelize, hard_voxelize
-from torch.onnx import register_custom_op_symbolic
 
 class _Voxelization(Function):
 
     @staticmethod
+    # @torch.jit.script
     def forward(ctx,
                 points,
                 voxel_size,
@@ -38,41 +38,27 @@ class _Voxelization(Function):
             num_points_per_voxel: [M] int32 tensor. Only returned when
                 max_points != -1.
         """
-        if max_points == -1 or max_voxels == -1:
-            coors = points.new_zeros(size=(points.size(0), 3), dtype=torch.int)
-            dynamic_voxelize(points, coors, voxel_size, coors_range, 3)
-            return coors
-        else:
-            voxels = points.new_zeros(
-                size=(max_voxels, max_points, points.size(1)))
-            coors = points.new_zeros(size=(max_voxels, 3), dtype=torch.int)
-            num_points_per_voxel = points.new_zeros(
-                size=(max_voxels, ), dtype=torch.int)
-            voxel_num = hard_voxelize(points, voxels, coors,
-                                      num_points_per_voxel, voxel_size,
-                                      coors_range, max_points, max_voxels, 3)
-            # select the valid voxels
-            voxels_out = voxels[:voxel_num]
-            coors_out = coors[:voxel_num]
-            num_points_per_voxel_out = num_points_per_voxel[:voxel_num]
-            return voxels_out, coors_out, num_points_per_voxel_out
-
-
+        # if max_points == -1 or max_voxels == -1:
+        #     coors = points.new_zeros(size=(points.size(0), 3), dtype=torch.int)
+        #     dynamic_voxelize(points, coors, voxel_size, coors_range, 3)
+        #     return coors
+        # else:
+        voxels = points.new_zeros(
+            size=(max_voxels, max_points, points.size(1)))
+        coors = points.new_zeros(size=(max_voxels, 3), dtype=torch.int)
+        num_points_per_voxel = points.new_zeros(
+            size=(max_voxels, ), dtype=torch.int)
+        voxel_num = hard_voxelize(points, voxels, coors,
+                                  num_points_per_voxel, voxel_size,
+                                  coors_range, max_points, max_voxels, 3)
+        # select the valid voxels
+        voxels_out = voxels[:voxel_num]
+        coors_out = coors[:voxel_num]
+        num_points_per_voxel_out = num_points_per_voxel[:voxel_num]
+        return voxels_out, coors_out, num_points_per_voxel_out
 
 
 voxelization = _Voxelization.apply
-
-from torch.onnx.symbolic_helper import parse_args
-from torch.onnx import register_custom_op_symbolic
-
-@parse_args('v', 'v', 'f', 'i')
-def symbolic(g, ctx, points, voxel_size, coors_range, max_points=35, max_voxels=20000):
-    #return g.op("nonentity", mat1, mat2, self, beta_f=beta, alpha_f=alpha)
-    return g.op("_Voxelization",ctx, points,coors_range, max_points, max_voxels)
-
-
-register_custom_op_symbolic("custom_ops::_Voxelization", symbolic, 9)
-
 
 
 class Voxelization(nn.Module):
@@ -122,9 +108,10 @@ class Voxelization(nn.Module):
             max_voxels = self.max_voxels[0]
         else:
             max_voxels = self.max_voxels[1]
-
-        return voxelization(input, self.voxel_size, self.point_cloud_range,
-                            self.max_num_points, max_voxels)
+        list = voxelization(input, self.voxel_size, self.point_cloud_range,
+                                                                       self.max_num_points, max_voxels)
+        voxels, coors, num_points = list[0],list[1],list[2]
+        return voxels, coors, num_points
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + '('

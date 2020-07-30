@@ -126,7 +126,7 @@ class PillarFeatureNet(nn.Module):
         # empty pillars remain set to zeros.
         voxel_count = features.shape[1]
         mask = get_paddings_indicator(num_points, voxel_count, axis=0)
-        mask = torch.unsqueeze(mask, -1).type_as(features)
+        mask = torch.unsqueeze(mask, 2).type_as(features)
         features *= mask
 
         for pfn in self.pfn_layers:
