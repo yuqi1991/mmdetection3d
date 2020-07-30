@@ -99,7 +99,7 @@ class Voxelization(nn.Module):
         # [w, h, d] -> [d, h, w]
         self.pcd_shape = [*input_feat_shape, 1][::-1]
 
-    def forward(self, input):
+    def forward(self, points):
         """
         Args:
             input: NC points
@@ -108,10 +108,21 @@ class Voxelization(nn.Module):
             max_voxels = self.max_voxels[0]
         else:
             max_voxels = self.max_voxels[1]
-        list = voxelization(input, self.voxel_size, self.point_cloud_range,
-                                                                       self.max_num_points, max_voxels)
-        voxels, coors, num_points = list[0],list[1],list[2]
-        return voxels, coors, num_points
+
+        voxels = points.new_zeros(
+            size=(max_voxels, self.max_num_points, points.size(1)))
+        coors = points.new_zeros(size=(max_voxels, 3), dtype=torch.int)
+        num_points_per_voxel = points.new_zeros(
+            size=(max_voxels, ), dtype=torch.int)
+        voxel_num = hard_voxelize(points, voxels, coors,
+                                  num_points_per_voxel, self.voxel_size,
+                                  self.point_cloud_range, self.max_num_points, max_voxels, 3)
+        # select the valid voxels
+        voxels_out = voxels[:voxel_num]
+        coors_out = coors[:voxel_num]
+        num_points_per_voxel_out = num_points_per_voxel[:voxel_num]
+        return voxels_out, coors_out, num_points_per_voxel_out
+        # return voxelization(input, self.voxel_size, self.point_cloud_range,self.max_num_points, max_voxels)
 
     def __repr__(self):
         tmpstr = self.__class__.__name__ + '('

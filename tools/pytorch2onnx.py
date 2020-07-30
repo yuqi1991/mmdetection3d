@@ -43,10 +43,13 @@ def export_onnx_model(model, inputs, passes):
                 model,
                 inputs,
                 f,
+                input_names=['input'],
+                # output_names=['output'],
                 operator_export_type=OperatorExportTypes.ONNX,
-                # keep_initializers_as_inputs=True
+                keep_initializers_as_inputs=True,
                 # verbose=True,  # NOTE: uncomment this for debugging
                 # export_params=True,
+                dynamic_axes = {'input':[0]}
             )
             onnx_model = onnx.load_from_string(f.getvalue())
 
@@ -74,7 +77,7 @@ def check_onnx_model(model_file, dummy, torch_result):
     ort_outs = ort_session.run(None, ort_inputs)
 
     # compare ONNX Runtime and PyTorch results
-    np.testing.assert_allclose(to_numpy(torch_result), ort_outs[0], rtol=1e-03, atol=1e-07)
+    np.testing.assert_allclose(to_numpy(torch_result[0]), ort_outs[0], rtol=1e-03, atol=1e-07)
 
     # with open("test_result", "wb") as f:
     #     (torch_result[0]).detach().numpy().tofile(f)
@@ -179,9 +182,9 @@ def main():
     print(f'saving model in {args.out}')
     onnx.save(onnx_model, args.out)
 
-    torch_result = model(voxels,num_points,coors)
+    torch_result = model(points)
 
-    check_onnx_model(args.out, (voxels,num_points,coors ),torch_result)
+    check_onnx_model(args.out, [points],torch_result)
 
 
 if __name__ == '__main__':

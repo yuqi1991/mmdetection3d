@@ -77,7 +77,9 @@ class VoxelNet(SingleStage3DDetector):
         # num_points = torch.cat(num_points, dim=0)
         # coors_batch = []
         # for i, coor in enumerate(coors):
-        coors = F.pad(coors, (1, 0), mode='constant', value=0)
+        coors = coors.float()
+        coors = F.pad(coors, [1, 0], mode='constant', value=0)
+        coors = coors.int()
             # coors_batch.append(coor_pad)
         # coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors
@@ -124,14 +126,14 @@ class VoxelNet(SingleStage3DDetector):
 
     def forward_dummy(self, points):
         voxels, num_points, coors = self.voxelize_dummy(points)
-        voxel_features = self.voxel_encoder(voxels, num_points, coors)
-        # batch_size = coors[-1, 0].item() + 1
-        batch_size = 1
+        # voxel_features = self.voxel_encoder(voxels, num_points, coors)
+        # # batch_size = coors[-1, 0].item() + 1
+        # batch_size = 1
         # x = self.middle_encoder(voxel_features, coors, batch_size)
         # x = self.backbone(x)
         # if self.with_neck:
         #     x = self.neck(x)
-        return voxel_features
+        return voxels, num_points, coors
 
 
     def aug_test(self, points, img_metas, imgs=None, rescale=False):
