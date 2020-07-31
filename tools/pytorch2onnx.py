@@ -14,6 +14,10 @@ from torch.onnx import OperatorExportTypes
 from mmdet3d.models import build_detector
 from tools.remove_initializer import remove_initializer_from_input
 
+from mmdet3d.ops.voxel.voxelize import voxelization
+
+
+
 
 def export_onnx_model(model, inputs, passes):
     """Trace and export a model to onnx format. Modified from
@@ -36,6 +40,7 @@ def export_onnx_model(model, inputs, passes):
 
     model.apply(_check_eval)
 
+
     # Export the model to ONNX
     with torch.no_grad():
         with io.BytesIO() as f:
@@ -44,12 +49,14 @@ def export_onnx_model(model, inputs, passes):
                 inputs,
                 f,
                 input_names=['input'],
-                # output_names=['output'],
+                output_names=['output'],
                 operator_export_type=OperatorExportTypes.ONNX,
-                keep_initializers_as_inputs=True,
+                # keep_initializers_as_inputs=True,
                 # verbose=True,  # NOTE: uncomment this for debugging
                 # export_params=True,
-                dynamic_axes = {'input':[0]}
+                dynamic_axes = {'input': {0 : 'point_num'}},
+                do_constant_folding=True,
+                opset_version=12,
             )
             onnx_model = onnx.load_from_string(f.getvalue())
 
@@ -58,15 +65,16 @@ def export_onnx_model(model, inputs, passes):
         all_passes = optimizer.get_available_passes()
         assert all(p in all_passes for p in passes), \
             f'Only {all_passes} are supported'
-    onnx_model = optimizer.optimize(onnx_model, passes)
+    # onnx_model = optimizer.optimize(onnx_model, passes)
     return onnx_model
 
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 def check_onnx_model(model_file, dummy, torch_result):
+
+
     onnx_model = onnx.load(model_file)
-    onnx_model = remove_initializer_from_input(onnx_model)
     onnx.checker.check_model(onnx_model)
 
     ort_session = onnxruntime.InferenceSession(model_file)
@@ -107,7 +115,10 @@ def parse_args():
 
 
 def register_custom_op():
-    def hard_voxelize(g,
+
+    from torch.onnx.symbolic_helper import parse_args
+    @parse_args('v', 'v', 'v', 'v','v', 'v', 'v', 'v', 'v')
+    def regis_hard_voxelize(g,
                       points,
                       voxels,
                       coors,
@@ -117,7 +128,7 @@ def register_custom_op():
                       max_points,
                       max_voxels,
                       NDim):
-        return g.op("voxelization::hard_voxelize", points,
+        return g.op("my_onnx::hard_voxelize", points,
                     voxels,
                     coors,
                     num_points_per_voxel,
@@ -128,7 +139,7 @@ def register_custom_op():
                     NDim)
 
     from torch.onnx import register_custom_op_symbolic
-    register_custom_op_symbolic("voxelization::hard_voxelize", hard_voxelize, 9)
+    register_custom_op_symbolic("voxelization::hard_voxelize", regis_hard_voxelize, 12)
 
 def main():
     args = parse_args()
@@ -156,27 +167,16 @@ def main():
             'ONNX conversion is currently not currently supported with '
             f'{model.__class__.__name__}')
 
-    input_data = torch.zeros(args.shape,dtype=next(model.parameters()).dtype,
-                         device=next(model.parameters()).device)
-    input_data.fill_(0.5)
+    # input_data = torch.zeros(args.shape,dtype=next(model.parameters()).dtype,
+    #                      device=next(model.parameters()).device)
+    # input_data.fill_(0.5)
 
-    points = np.fromfile("/home/liyuqi/Downloads/save_result/points_4", dtype=np.float32)
+    points = np.fromfile("/home/liyuqi/Downloads/save_result/points_2", dtype=np.float32)
     points=points.reshape([-1,4])
     points=torch.from_numpy(points)
 
-    voxels = np.fromfile("/home/liyuqi/Downloads/save_result/voxels_4", dtype=np.float32)
-    voxels=voxels.reshape([-1,32,4])
-    voxels=torch.from_numpy(voxels)
-
-    num_points = np.fromfile("/home/liyuqi/Downloads/save_result/num_points_4", dtype=np.int32)
-    # num_points=num_points.reshape([-1,4])
-    num_points=torch.from_numpy(num_points)
-
-    coors = np.fromfile("/home/liyuqi/Downloads/save_result/coors_4", dtype=np.int32)
-    coors=coors.reshape([-1,4])
-    coors=torch.from_numpy(coors)
-
     onnx_model = export_onnx_model(model, (points,), args.passes)
+    onnx_model = remove_initializer_from_input(onnx_model)
     # Print a human readable representation of the graph
     onnx.helper.printable_graph(onnx_model.graph)
     print(f'saving model in {args.out}')
@@ -187,5 +187,7 @@ def main():
     check_onnx_model(args.out, [points],torch_result)
 
 
+
 if __name__ == '__main__':
+
     main()

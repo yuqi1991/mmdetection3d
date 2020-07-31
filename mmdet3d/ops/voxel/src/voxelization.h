@@ -1,5 +1,6 @@
 #pragma once
 #include <torch/extension.h>
+#include <cstdlib>
 
 namespace voxelization {
 
@@ -61,6 +62,41 @@ inline int hard_voxelize(const at::Tensor& points, at::Tensor& voxels,
   return hard_voxelize_cpu(points, voxels, coors, num_points_per_voxel,
                            voxel_size, coors_range, max_points, max_voxels,
                            NDim);
+}
+
+inline torch::Tensor hard_voxelize_torch(at::Tensor points, at::Tensor voxels,
+                         at::Tensor coors, at::Tensor num_points_per_voxel,
+                         const std::vector<double> voxel_size,
+                         const std::vector<double> coors_range,
+                         const int64_t max_points, const int64_t max_voxels,
+                         const int64_t NDim = 3) {
+
+  std::vector<float> voxel_size_(voxel_size.begin(), voxel_size.end());
+  std::vector<float> coors_range_(coors_range.begin(), coors_range.end());
+
+  if (points.device().is_cuda()) {
+#ifdef WITH_CUDA
+    int result =  hard_voxelize_gpu(points, voxels, coors, num_points_per_voxel,
+                             voxel_size_, coors_range_,
+                             static_cast<int>(max_points),
+                             static_cast<int>(max_voxels),
+                             static_cast<int>(NDim));
+    auto voxel_num = torch::zeros({1},torch::requires_grad(false).dtype(torch::kInt32));
+    voxel_num[0] = result;
+    return voxel_num;
+#else
+    AT_ERROR("Not compiled with GPU support");
+#endif
+  }
+  int result = hard_voxelize_cpu(points, voxels, coors, num_points_per_voxel,
+						   voxel_size_, coors_range_,
+						   static_cast<int>(max_points),
+						   static_cast<int>(max_voxels),
+	                       static_cast<int>(NDim));
+
+  auto voxel_num = torch::zeros({1},torch::requires_grad(false).dtype(torch::kInt32));
+  voxel_num[0] = result;
+  return voxel_num;
 }
 
 inline void dynamic_voxelize(const at::Tensor& points, at::Tensor& coors,

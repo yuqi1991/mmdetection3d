@@ -69,7 +69,7 @@ class VoxelNet(SingleStage3DDetector):
         """Apply hard voxelization to points."""
         # voxels, coors, num_points = [], [], []
         # for res in points:
-        voxels, coors, num_points = self.voxel_layer(points)
+        voxels,coors,num_points = self.voxel_layer(points)
         # voxels.append(res_voxels)
         # coors.append(res_coors)
         # num_points.append(res_num_points)
@@ -82,7 +82,7 @@ class VoxelNet(SingleStage3DDetector):
         coors = coors.int()
             # coors_batch.append(coor_pad)
         # coors_batch = torch.cat(coors_batch, dim=0)
-        return voxels, num_points, coors
+        return voxels,coors,num_points
 
     def forward_train(self,
                       points,
@@ -125,15 +125,15 @@ class VoxelNet(SingleStage3DDetector):
         return bbox_results[0]
 
     def forward_dummy(self, points):
-        voxels, num_points, coors = self.voxelize_dummy(points)
-        # voxel_features = self.voxel_encoder(voxels, num_points, coors)
-        # # batch_size = coors[-1, 0].item() + 1
-        # batch_size = 1
-        # x = self.middle_encoder(voxel_features, coors, batch_size)
-        # x = self.backbone(x)
-        # if self.with_neck:
-        #     x = self.neck(x)
-        return voxels, num_points, coors
+        voxels,coors,num_points = self.voxelize_dummy(points)
+        voxel_features = self.voxel_encoder(voxels, num_points, coors)
+        # batch_size = coors[-1, 0].item() + 1
+        batch_size = 1
+        x = self.middle_encoder(voxel_features, coors, batch_size)
+        x = self.backbone(x)
+        if self.with_neck:
+            x = self.neck(x)
+        return x
 
 
     def aug_test(self, points, img_metas, imgs=None, rescale=False):

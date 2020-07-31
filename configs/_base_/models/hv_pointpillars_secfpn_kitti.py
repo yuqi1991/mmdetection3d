@@ -1,9 +1,9 @@
-voxel_size = [0.16, 0.16, 4]
+voxel_size = [0.16, 0.16, 4.0]
 model = dict(
     type='VoxelNet',
     voxel_layer=dict(
         max_num_points=32,
-        point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
+        point_cloud_range=[0.0, -39.68, -3.0, 69.12, 39.68, 1.0],
         voxel_size=voxel_size,
         max_voxels=(16000, 40000)),
     voxel_encoder=dict(

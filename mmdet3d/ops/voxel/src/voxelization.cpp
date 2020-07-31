@@ -11,4 +11,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("dynamic_point_to_voxel_backward", &dynamic_point_to_voxel_backward, "dynamic point to voxel backward");
 }
 
+static auto registry = torch::RegisterOperators("voxelization::hard_voxelize", &hard_voxelize_torch);
+//static auto registry = torch::RegisterOperators("voxelization::dynamic_voxelize", &dynamic_voxelize);
+
 } // namespace voxelization
